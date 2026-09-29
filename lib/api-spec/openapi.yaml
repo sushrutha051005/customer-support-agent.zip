@@ -1,0 +1,286 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: support
+    description: Customer support operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /support/overview:
+    get:
+      operationId: getSupportOverview
+      tags: [support]
+      summary: Get support workspace overview
+      responses:
+        "200":
+          description: Workspace summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportOverview"
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [support]
+      summary: List customers for the support workspace
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, open, waiting, resolved]
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+  /customers/{customerId}:
+    get:
+      operationId: getCustomer
+      tags: [support]
+      summary: Get a customer with their support memory
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDetail"
+        "404":
+          description: Customer not found
+  /customers/{customerId}/timeline:
+    get:
+      operationId: getCustomerTimeline
+      tags: [support]
+      summary: Get a customer's past tickets and support events
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer timeline
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimelineEvent"
+  /customers/{customerId}/memories:
+    post:
+      operationId: addCustomerMemory
+      tags: [support]
+      summary: Add a durable customer memory
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryInput"
+      responses:
+        "201":
+          description: Created memory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Memory"
+  /customers/{customerId}/chat:
+    post:
+      operationId: sendSupportMessage
+      tags: [support]
+      summary: Send a support message through the memory-aware AI agent
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: AI support response with retrieval citations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Customer:
+      type: object
+      required: [id, name, email, company, avatar, plan, status, frustrationLevel, lastSeenAt, openTickets, tags]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        company: { type: string }
+        avatar: { type: string }
+        plan: { type: string }
+        status:
+          type: string
+          enum: [open, waiting, resolved]
+        frustrationLevel:
+          type: integer
+          minimum: 0
+          maximum: 100
+        lastSeenAt: { type: string }
+        openTickets: { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+    CustomerDetail:
+      allOf:
+        - $ref: "#/components/schemas/Customer"
+        - type: object
+          required: [environment, knownIssues, preferredTone, memories]
+          properties:
+            environment:
+              type: object
+              required: [browser, operatingSystem, device, version]
+              properties:
+                browser: { type: string }
+                operatingSystem: { type: string }
+                device: { type: string }
+                version: { type: string }
+            knownIssues:
+              type: array
+              items: { type: string }
+            preferredTone: { type: string }
+            memories:
+              type: array
+              items:
+                $ref: "#/components/schemas/Memory"
+    Memory:
+      type: object
+      required: [id, kind, title, content, confidence, source, createdAt]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum: [preference, issue, environment, solution, note]
+        title: { type: string }
+        content: { type: string }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        source: { type: string }
+        createdAt: { type: string }
+    MemoryInput:
+      type: object
+      required: [kind, title, content]
+      properties:
+        kind:
+          type: string
+          enum: [preference, issue, environment, solution, note]
+        title: { type: string, minLength: 1 }
+        content: { type: string, minLength: 1 }
+    TimelineEvent:
+      type: object
+      required: [id, type, title, summary, status, occurredAt, sentiment, solutionWorked]
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [ticket, email, call, note]
+        title: { type: string }
+        summary: { type: string }
+        status:
+          type: string
+          enum: [open, waiting, resolved]
+        occurredAt: { type: string }
+        sentiment:
+          type: string
+          enum: [positive, neutral, frustrated]
+        solutionWorked: { type: boolean }
+    SupportOverview:
+      type: object
+      required: [activeCustomers, openTickets, avgResponseTime, memoriesCaptured, recentActivity]
+      properties:
+        activeCustomers: { type: integer }
+        openTickets: { type: integer }
+        avgResponseTime: { type: string }
+        memoriesCaptured: { type: integer }
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+    ChatInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1 }
+    ChatCitation:
+      type: object
+      required: [memoryId, title, snippet, relevance]
+      properties:
+        memoryId: { type: string }
+        title: { type: string }
+        snippet: { type: string }
+        relevance: { type: number, minimum: 0, maximum: 1 }
+    ChatResponse:
+      type: object
+      required: [id, message, citations, suggestedAction, capturedMemory]
+      properties:
+        id: { type: string }
+        message: { type: string }
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatCitation"
+        suggestedAction: { type: string }
+        capturedMemory:
+          type: ["string", "null"]
+

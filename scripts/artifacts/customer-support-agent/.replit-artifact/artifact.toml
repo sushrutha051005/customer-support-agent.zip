@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Customer Support Agent"
+description = "A memory-aware support workspace that brings customer history, known issues, environment details, and proven solutions into every support conversation, with an AI agent powered by real backend retrieval."
+version = "1.0.0"
+id = "artifacts/customer-support-agent"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25836
+
+[services.development]
+run = "pnpm --filter @workspace/customer-support-agent run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/customer-support-agent", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/customer-support-agent/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25836"
+BASE_PATH = "/"
